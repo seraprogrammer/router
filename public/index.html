@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Custom Router with External Pages</title>
+    <style>
+      .active {
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/" class="link" data-link>Home</a>
+      <a href="/about" class="link" data-link>About</a>
+      <a href="/contact" class="link" data-link>Contact</a>
+      <a href="/external" class="link" data-link>External Page</a>
+    </nav>
+
+    <div id="app"></div>
+
+    <template router="/">
+      <h1>Home</h1>
+      <p>Welcome to the home page!</p>
+    </template>
+
+    <template router="/about" load="views/about.html"> </template>
+
+    <template router="/contact">
+      <h1>Contact</h1>
+      <p>This is the contact page content.</p>
+    </template>
+    <template router="/external">
+      <!-- Placeholder for external page content -->
+      <h1 style="color: greenyellow">External Page</h1>
+      <p>This is the content of external page.</p>
+    </template>
+
+    <script>
+      class CustomRouter {
+        constructor() {
+          this.routes = this.collectRoutes();
+          this.init();
+        }
+
+        collectRoutes() {
+          const routeElements = document.querySelectorAll("template[router]");
+          const routes = {};
+
+          routeElements.forEach((template) => {
+            const path = template.getAttribute("router");
+            const loadUrl = template.getAttribute("load");
+
+            // If 'load' attribute is present, use it to load external content
+            if (loadUrl) {
+              routes[path] = this.loadExternalPage(loadUrl);
+            } else {
+              routes[path] = this.loadTemplate(path);
+            }
+          });
+          return routes;
+        }
+
+        init() {
+          this.loadInitialRoute();
+
+          // Handle link clicks
+          document.body.addEventListener("click", (e) => {
+            if (e.target.matches("[data-link]")) {
+              e.preventDefault();
+              const url = e.target.getAttribute("href");
+              this.loadRoute(url);
+            }
+          });
+
+          // Handle back/forward navigation
+          window.addEventListener("popstate", () => {
+            this.loadRoute(window.location.pathname);
+          });
+        }
+
+        loadInitialRoute() {
+          const path = window.location.pathname;
+          if (this.routes[path]) {
+            this.loadRoute(path);
+          } else {
+            this.loadNotFound();
+          }
+        }
+
+        loadRoute(path) {
+          if (this.routes[path]) {
+            this.routes[path]
+              .then((content) => {
+                document.getElementById("app").innerHTML = content;
+                this.setActiveLink(path);
+                window.history.pushState({}, "", path);
+              })
+              .catch((err) => {
+                console.error(err);
+                this.loadNotFound();
+              });
+          } else {
+            this.loadNotFound();
+          }
+        }
+
+        loadTemplate(path) {
+          return new Promise((resolve) => {
+            const template = document.querySelector(
+              `template[router="${path}"]`
+            );
+            resolve(template.innerHTML);
+          });
+        }
+
+        loadExternalPage(url) {
+          return fetch(url).then((response) => {
+            if (!response.ok) {
+              throw new Error(
+                `Failed to load external page: ${response.statusText}`
+              );
+            }
+            return response.text();
+          });
+        }
+
+        loadNotFound() {
+          document.getElementById(
+            "app"
+          ).innerHTML = `<h1>404</h1><p>Page not found!</p>`;
+        }
+
+        setActiveLink(url) {
+          const links = document.querySelectorAll(".link");
+          links.forEach((link) => {
+            link.classList.toggle("active", link.getAttribute("href") === url);
+          });
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        new CustomRouter();
+      });
+    </script>
+  </body>
+</html>
